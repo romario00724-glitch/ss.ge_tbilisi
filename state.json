@@ -1437,7 +1437,7 @@
 "2026-10-10"
 ]
 },
-"fail_streak": 0,
+"fail_streak": 1,
 "searches": {
 "{\"advancedSearch\":{\"individualEntityOnly\":true},\"cityIdList\":[95],\"currencyId\":2,\"order\":1,\"priceFrom\":350,\"priceType\":1,\"realEstateDealType\":1,\"realEstateType\":5}": "2026-10-10"
 },
