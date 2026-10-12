@@ -36,6 +36,8 @@ import no_realtors  # фільтр «не сотрудничаю с риелто
 # а на своєму комп'ютері — з файлу telegram.json поруч зі скриптом.
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")  # кілька чатів — через кому
+# Інші групи: пошук у searches.txt з третьою частиною «| sale» іде в чат з TELEGRAM_CHAT_ID_SALE
+# (у telegram.json — "chat_id_sale"). Без нього такий пошук пропускається, в основну групу не йде.
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")  # якщо задано — грузинські/англійські описи в чаті перекладаються
 OPENAI_MODEL = os.getenv("OPENAI_MODEL") or "gpt-5-mini"
 
@@ -92,7 +94,7 @@ if hasattr(sys.stdout, "reconfigure"):
 
 def load_telegram_file():
     """Доповнює токен, chat_id і ключ OpenAI з telegram.json, якщо їх не задано змінними середовища."""
-    global TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, OPENAI_API_KEY
+    global TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, OPENAI_API_KEY, FILE_GROUP_CHATS
     if not TELEGRAM_FILE.exists():
         return
     try:
@@ -103,8 +105,11 @@ def load_telegram_file():
     TELEGRAM_BOT_TOKEN = TELEGRAM_BOT_TOKEN or str(cfg.get("token") or "").strip()
     TELEGRAM_CHAT_ID = TELEGRAM_CHAT_ID or str(cfg.get("chat_id") or "").strip()
     OPENAI_API_KEY = OPENAI_API_KEY or str(cfg.get("openai_key") or "").strip()
+    FILE_GROUP_CHATS = {k[len("chat_id_"):].lower(): str(v or "").strip()
+                        for k, v in cfg.items() if k.startswith("chat_id_")}
 
 
+FILE_GROUP_CHATS = {}  # chat_id інших груп з telegram.json: {"sale": "-100…"}
 load_telegram_file()
 
 
@@ -265,12 +270,13 @@ def load_searches():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
-        label, url = ("", line)
-        if "|" in line:
-            label, url = (part.strip() for part in line.split("|", 1))
+        parts = [part.strip() for part in line.split("|")]
+        label, url, group = (["", *parts] if len(parts) == 1 else parts + [""])[:3]
         if "ss.ge" not in url:
             continue  # рядок-заглушка або щось стороннє
-        searches.append((label or "ss.ge", url))
+        if group and not re.fullmatch(r"[A-Za-z0-9_]+", group):
+            raise ConfigError(f"назва групи «{group}» — лише латинські літери, цифри й _ (наприклад, sale)")
+        searches.append((label or "ss.ge", url, group.lower()))
     if not searches:
         raise ConfigError(f"у {SEARCHES_FILE.name} немає жодного посилання на ss.ge — "
                           "вставте туди адресу сторінки пошуку (інструкція всередині файлу)")
@@ -752,12 +758,15 @@ def print_listing(item, label, count):
 
 # ─────────────────────────────── Telegram ───────────────────────────────
 
-def chat_ids():
-    return [c.strip() for c in str(TELEGRAM_CHAT_ID).split(",") if c.strip()]
+def chat_ids(group=""):
+    """Чати групи: основна — TELEGRAM_CHAT_ID, інша (sale) — TELEGRAM_CHAT_ID_SALE."""
+    raw = (os.getenv(f"TELEGRAM_CHAT_ID_{group.upper()}") or FILE_GROUP_CHATS.get(group, "")
+           if group else TELEGRAM_CHAT_ID)
+    return [c.strip() for c in str(raw).split(",") if c.strip()]
 
 
-def telegram_ready():
-    return bool(TELEGRAM_BOT_TOKEN and chat_ids())
+def telegram_ready(group=""):
+    return bool(TELEGRAM_BOT_TOKEN and chat_ids(group))
 
 
 def _post_json(url, payload, headers=None, timeout=30):
@@ -796,8 +805,8 @@ def tg_call(method, payload):
     return {"ok": False, "description": "забагато спроб"}
 
 
-def send_text(text):
-    for chat in chat_ids():
+def send_text(text, group=""):
+    for chat in chat_ids(group):
         result = tg_call("sendMessage", {"chat_id": chat, "text": text, "parse_mode": "HTML",
                                          "link_preview_options": {"is_disabled": True}})
         if not result.get("ok"):
@@ -873,15 +882,15 @@ def send_photo(chat, urls, caption):
     return result
 
 
-def send_listing(item, label, count):
-    """Надсилає оголошення у всі чати. True, якщо дійшло хоча б в один."""
+def send_listing(item, label, count, group=""):
+    """Надсилає оголошення у всі чати групи. True, якщо дійшло хоча б в один."""
     photos = image_urls(item)
     caption = build_message(item, label, count, max_len=1024)
     full_text = build_message(item, label, count)
     if not photos:
         log(f"  оголошення {item['id']}: на сайті немає фото")
     delivered = False
-    for chat in chat_ids():
+    for chat in chat_ids(group):
         result = send_photo(chat, photos, caption) if photos else {"ok": False}
         if not result.get("ok"):  # фото не підійшло — шлемо текстом
             result = tg_call("sendMessage", {"chat_id": chat, "text": full_text,
@@ -1013,7 +1022,11 @@ def run_once(state):
     seen = seen_ids(state)
     candidates, batch, any_ok = [], set(), False
 
-    for label, url in searches:
+    for label, url, group in searches:
+        if group and telegram_ready() and not telegram_ready(group):
+            log(f"[{label}] не задано чат групи «{group}» (секрет TELEGRAM_CHAT_ID_{group.upper()}) — "
+                "пропускаю пошук")
+            continue
         try:
             params = search_params(url)
         except ConfigError as e:
@@ -1049,30 +1062,30 @@ def run_once(state):
                     register_author(state, item, day)
             state["searches"][key] = day
             log(f"[{label}] перший запуск: запам'ятав {len(found)} оголошень, далі — лише нові")
-            if telegram_ready():
+            if telegram_ready(group):
                 send_text(f"✅ Слежу за поиском «{html.escape(label)}». Текущие {len(found)} "
-                          "объявлений запомнил — буду присылать только новые.")
+                          "объявлений запомнил — буду присылать только новые.", group)
             continue
 
         for item in found:
             listing_id = int(item["id"])
             if listing_id not in seen and listing_id not in batch:
                 batch.add(listing_id)
-                candidates.append((label, item))
+                candidates.append((label, group, item))
 
     update_fail_streak(state, any_ok)
     if not candidates:
         log("нових оголошень немає" if any_ok else "не вдалося отримати дані з ss.ge")
         return
 
-    candidates.sort(key=lambda c: int(c[1]["id"]), reverse=True)  # новіші мають більший id
+    candidates.sort(key=lambda c: int(c[2]["id"]), reverse=True)  # новіші мають більший id
     if len(candidates) > MAX_ALERTS_PER_RUN:
         log(f"нових {len(candidates)}, надсилаю {MAX_ALERTS_PER_RUN}, решту — наступного разу")
         candidates = candidates[:MAX_ALERTS_PER_RUN]
     candidates.reverse()  # у чаті йдуть від старших до новіших
 
     sent, translate_deadline = 0, time.time() + TRANSLATE_BUDGET_SECONDS
-    for label, item in candidates:
+    for label, group, item in candidates:
         if FETCH_DETAILS:
             enrich_with_details(item)
             time.sleep(random.uniform(0.5, 1.2))
@@ -1090,8 +1103,8 @@ def run_once(state):
                 plain_text(item.get("comment")) + " " + str(item.get("_ru_comment") or "")):
             log(f"  пропускаю {item['id']}: автор пише, що не співпрацює з рієлторами")
             delivered = True
-        elif telegram_ready():
-            delivered = send_listing(item, label, count)
+        elif telegram_ready(group):
+            delivered = send_listing(item, label, count, group)
         else:
             print_listing(item, label, count)
             delivered = True
@@ -1121,7 +1134,7 @@ def cmd_loop():
 
 
 def cmd_test():
-    label, url = load_searches()[0]
+    label, url, group = load_searches()[0]
     params = search_params(url)
     log(f"[{label}] запит до ss.ge...")
     items = fetch_page(params, 1)
@@ -1139,8 +1152,8 @@ def cmd_test():
     else:
         log("Кількість оголошень автора в даних сайту не знайдено. Запустіть "
             "python watcher.py --dump і надішліть файли dump_list.json та dump_detail.json.")
-    if telegram_ready():
-        ok = send_listing(item, f"🧪 ТЕСТ · {label}", 0)
+    if telegram_ready(group):
+        ok = send_listing(item, f"🧪 ТЕСТ · {label}", 0, group)
         log("Тестове повідомлення надіслано ✅" if ok else "Не вдалося надіслати в Telegram ❌")
     else:
         log("Telegram ще не налаштований: вкажіть TELEGRAM_BOT_TOKEN і TELEGRAM_CHAT_ID.")
@@ -1149,7 +1162,7 @@ def cmd_test():
 
 def cmd_dump():
     """Зберігає «сирі» відповіді сайту, щоб подивитися, які поля там є."""
-    label, url = load_searches()[0]
+    label, url, _ = load_searches()[0]
     raw_list = api_call("/v1/RealEstate/LegendSearch", {**search_params(url), "page": 1, "pageSize": PAGE_SIZE})
     (BASE_DIR / "dump_list.json").write_text(
         json.dumps(raw_list, ensure_ascii=False, indent=2), encoding="utf-8")
