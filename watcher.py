@@ -29,7 +29,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-import no_realtors  # лише Тбілісі (sync_from_batumi.py)
+import no_realtors  # фільтр «не сотрудничаю с риелторами» (є лише в Тбілісі)
 
 # ─────────────────────────────── НАЛАШТУВАННЯ ───────────────────────────────
 # Токен і chat_id беруться зі змінних середовища (на GitHub — Secrets),

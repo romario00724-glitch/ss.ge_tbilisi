@@ -8,8 +8,8 @@
 Нечіткі фрази відмовою не вважаються: «агенты, не копируйте объявление», «без комиссии»,
 «без посредников», «я не плачу комиссию».
 
-watcher.py викликає refuses_realtors() через рядки з таблиці REPLACEMENTS у sync_from_batumi.py
-(SKIP_NO_REALTORS). Перевірено на 960 описах ss.ge (Тбілісі й Батумі) 12.10.2026.
+watcher.py викликає refuses_realtors() у run_once, якщо SKIP_NO_REALTORS = True.
+Перевірено на 960 описах ss.ge (Тбілісі й Батумі) 12.10.2026.
 """
 
 import re
