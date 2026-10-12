@@ -29,6 +29,8 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import no_realtors  # лише Тбілісі (sync_from_batumi.py)
+
 # ─────────────────────────────── НАЛАШТУВАННЯ ───────────────────────────────
 # Токен і chat_id беруться зі змінних середовища (на GitHub — Secrets),
 # а на своєму комп'ютері — з файлу telegram.json поруч зі скриптом.
@@ -47,6 +49,8 @@ AGENT_THRESHOLD = 3            # від скількох оголошень в �
 SKIP_SUSPECTED_AGENTS = False  # True — такі оголошення взагалі не надсилати
 SKIP_SITE_AGENTS = True        # не надсилати, якщо ss.ge сам ставить автору значок «Агент»
                                # (фільтр «От собственника» пропускає агентів-приватних осіб)
+SKIP_NO_REALTORS = True        # не надсилати, якщо автор пише «с агентствами не сотрудничаю»,
+                               # «агентам не звонить» (лише Тбілісі; «сотрудничаю 50%» — надсилати)
 MAX_ALERTS_PER_RUN = 25        # запобіжник від спаму; решта прийде наступного запуску
 LOOP_MINUTES = 10              # інтервал у безперервному режимі
 FAIL_ALERT_AFTER = 6           # після скількох невдалих перевірок поспіль написати в Telegram
@@ -1081,6 +1085,10 @@ def run_once(state):
             delivered = True
         elif SKIP_SITE_AGENTS and item.get("_site_agent"):
             log(f"  пропускаю {item['id']}: ss.ge ставить автору значок «Агент»")
+            delivered = True
+        elif SKIP_NO_REALTORS and no_realtors.refuses_realtors(
+                plain_text(item.get("comment")) + " " + str(item.get("_ru_comment") or "")):
+            log(f"  пропускаю {item['id']}: автор пише, що не співпрацює з рієлторами")
             delivered = True
         elif telegram_ready():
             delivered = send_listing(item, label, count)
