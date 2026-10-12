@@ -5,11 +5,14 @@
 #   2) за бажанням задайте район, ціну, кількість кімнат; у фільтрах можна увімкнути «От собственника»;
 #   3) натисніть пошук і скопіюйте адресу з адресного рядка браузера.
 # У правильному посиланні є «/l/Квартира/Аренда» (або bina/qiravdeba, Flat/For-Rent) і «cityIdList=...».
-# Тбілісі на ss.ge — cityIdList=95 (Батумі — 96).
+# Тбілісі на ss.ge — cityIdList=95 (Батумі — 96). Кілька міст — через кому: 95,7,36,70 — це Тбілісі
+# й села з розділу сайту «Окрестности Тбилиси»: Табахмела (7), Шиндиси (36), Цавкиси (70). Каклеби
+# на ss.ge — не окреме село, а вулиця в районі Багеби, тобто вже входить у Тбілісі (95).
 # Фільтр «От собственника» і сортування «за датою» скрипт додає сам, навіть якщо ви їх не вмикали.
 #
 # Ціна «від» — у самому посиланні: priceFrom=350&currencyId=2&priceType=1 (від $350 за місяць).
-# currencyId=2 — долари, 1 — лари; priceType=1 — ціна за всю квартиру (2 — за м²). Без priceType
+# Зараз: квартири від $350, будинки від $1000, комерція від $600.
+# currencyId=2 — долари, 1 — лари; priceType=1 — ціна за всю площу (2 — за м²). Без priceType
 # ss.ge ціну мовчки ігнорує. Оголошення без ціни з таким фільтром теж не приходять.
 #
 # Перед посиланням можна написати назву і « | » — вона буде видна в повідомленні
@@ -17,4 +20,6 @@
 # Приклад рядка:
 # Аренда Тбилиси | https://home.ss.ge/ru/недвижимость/l/Квартира/Аренда?cityIdList=95
 
-Аренда Тбилиси | https://home.ss.ge/ru/недвижимость/l/Квартира/Аренда?cityIdList=95&currencyId=2&priceType=1&priceFrom=350&order=1&advancedSearch={"individualEntityOnly":true}
+Аренда Тбилиси | https://home.ss.ge/ru/недвижимость/l/Квартира/Аренда?cityIdList=95,7,36,70&currencyId=2&priceType=1&priceFrom=350&order=1&advancedSearch={"individualEntityOnly":true}
+Аренда домов Тбилиси | https://home.ss.ge/ru/недвижимость/l/Дом/Аренда?cityIdList=95,7,36,70&currencyId=2&priceType=1&priceFrom=1000&order=1&advancedSearch={"individualEntityOnly":true}
+Аренда коммерции Тбилиси | https://home.ss.ge/ru/недвижимость/l/Комерческая-площадь/Аренда?cityIdList=95,7,36,70&currencyId=2&priceType=1&priceFrom=600&order=1&advancedSearch={"individualEntityOnly":true}
