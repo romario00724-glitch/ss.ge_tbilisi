@@ -271,7 +271,9 @@ def load_searches():
         if not line or line.startswith("#"):
             continue
         parts = [part.strip() for part in line.split("|")]
-        label, url, group = (["", *parts] if len(parts) == 1 else parts + [""])[:3]
+        if len(parts) == 1:  # лише посилання, без назви
+            parts.insert(0, "")
+        label, url, group = (parts + [""])[:3]
         if "ss.ge" not in url:
             continue  # рядок-заглушка або щось стороннє
         if group and not re.fullmatch(r"[A-Za-z0-9_]+", group):
