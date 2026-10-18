@@ -5948,6 +5948,10 @@
 1,
 "2026-10-16"
 ],
+"p:efb2e929a1a461f8": [
+1,
+"2026-10-18"
+],
 "p:efdfed04fe84689b": [
 1,
 "2026-10-17"
@@ -9495,6 +9499,10 @@
 "u:57ad3127-e611-4687-891b-a36a4c8c11ac": [
 1,
 "2026-10-10"
+],
+"u:580fe22a-3dbd-4fea-a4bc-2ebc1b263b23": [
+1,
+"2026-10-18"
 ],
 "u:58933214-8168-4a7c-95ba-34a5dbd677d2": [
 1,
@@ -15269,7 +15277,7 @@
 "2026-10-14"
 ]
 },
-"fail_streak": 1,
+"fail_streak": 0,
 "searches": {
 "{\"advancedSearch\":{\"individualEntityOnly\":true},\"cityIdList\":[95,7,36,70],\"currencyId\":2,\"order\":1,\"priceFrom\":1000,\"priceType\":1,\"realEstateDealType\":1,\"realEstateType\":4}": "2026-10-12",
 "{\"advancedSearch\":{\"individualEntityOnly\":true},\"cityIdList\":[95,7,36,70],\"currencyId\":2,\"order\":1,\"priceFrom\":100000,\"priceType\":1,\"realEstateDealType\":4,\"realEstateType\":4}": "2026-10-13",
@@ -18446,7 +18454,8 @@
 37050649,
 37050658,
 37050698,
-37050718
+37050718,
+37050719
 ]
 },
 "version": 1
