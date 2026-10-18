@@ -593,7 +593,7 @@
 "2026-10-13"
 ],
 "p:1983f4ba235de823": [
-7,
+8,
 "2026-10-18"
 ],
 "p:199aefce318b3825": [
@@ -3255,6 +3255,10 @@
 "p:82013c4e97afd6c6": [
 1,
 "2026-10-13"
+],
+"p:825ca5569ebff8ac": [
+1,
+"2026-10-18"
 ],
 "p:82e483ef26625a24": [
 1,
@@ -8405,7 +8409,7 @@
 "2026-10-13"
 ],
 "u:2fc6f702-abfe-4874-b3cc-cb5052f517d4": [
-7,
+8,
 "2026-10-18"
 ],
 "u:2fca8593-81a5-405f-acac-3adc02d79d95": [
@@ -15156,6 +15160,10 @@
 1,
 "2026-10-15"
 ],
+"u:f10ad538-f76c-4148-ab38-15554c4bafc4": [
+1,
+"2026-10-18"
+],
 "u:f11f1fb8-158c-437c-b6f9-bd490439dcc4": [
 1,
 "2026-10-12"
@@ -15745,7 +15753,7 @@
 "2026-10-14"
 ]
 },
-"fail_streak": 1,
+"fail_streak": 0,
 "searches": {
 "{\"advancedSearch\":{\"individualEntityOnly\":true},\"cityIdList\":[95,7,36,70],\"currencyId\":2,\"order\":1,\"priceFrom\":1000,\"priceType\":1,\"realEstateDealType\":1,\"realEstateType\":4}": "2026-10-12",
 "{\"advancedSearch\":{\"individualEntityOnly\":true},\"cityIdList\":[95,7,36,70],\"currencyId\":2,\"order\":1,\"priceFrom\":100000,\"priceType\":1,\"realEstateDealType\":4,\"realEstateType\":4}": "2026-10-13",
@@ -19024,7 +19032,9 @@
 37052322,
 37052353,
 37052365,
-37052372
+37052372,
+37052386,
+37052440
 ]
 },
 "version": 1
