@@ -60,6 +60,41 @@ cron-job.org ──► workflow_dispatch ──► GitHub Actions: python watche
   створюється з вимкненим «Enable job»; кілька хвилин у Custom-розкладі — лише з затиснутим ⌘ Cmd.
 - Запуски по одному (`concurrency: ss.ge_tbilisi`), checkout з `ref: ${{ github.ref_name }}`.
 - Після запуску workflow комітить `state.json` у `main` — локальний `main` відстає: `git pull`.
+- **Ключ до API з 22.10.2026 бере Mac** (див. нижче): без нього бот на GitHub ss.ge не читає.
+
+## Ключ до API бере Mac (з 22.10.2026)
+
+22.10.2026 ~16:00 ss.ge закрив серверам GitHub усе, що стоїть за Cloudflare: `home.ss.ge` (навіть
+`robots.txt`), `account.ss.ge`, `jobs.ss.ge` — 403 «Just a moment...» (`cf-mitigated: challenge`),
+з будь-яким «браузером» `curl_cffi` і з urllib (пробний workflow, `git log`). Бот Батумі — так само.
+З Mac усе відкривається. **API `api-gateway.ss.ge` — не за Cloudflare (`server: Kestrel`) і GitHub
+відкритий**, тож бракує лише гостьового ключа: він є тільки на сторінках `home.ss.ge`
+(`credentialsToken`, JWT від `account.ss.ge`, `client_id` ssweb, діє 1 год, IP не прив'язаний).
+Рішення користувача: ключ бере Mac, решта лишається на GitHub.
+
+```
+Mac (launchd, кожні 20 хв) ──► home.ss.ge ──► ключ ──► gh secret set SSGE_API_TOKEN
+GitHub (кожні 10 хв) ──► бере SSGE_API_TOKEN ──► API ss.ge ──► група
+```
+
+- `mac_token.py` — у репозиторії, але launchd не має доступу до «Робочого столу», тож на Mac працює
+  **копія**: `~/Library/Application Support/ss.ge_tbilisi/mac_token.py`; розклад —
+  `~/Library/LaunchAgents/local.ss.ge_tbilisi.token.plist` (`StartInterval` 1200, `RunAtLoad`);
+  журнал — `~/Library/Logs/ss.ge_tbilisi_token.log`. 3 спроби з паузою 30 с (після пробудження
+  інтернет з'являється не одразу). Ключ у журнал не пишеться. `gh` бере вхід з Keychain.
+- **Після зміни `mac_token.py`** скопіювати його в `~/Library/Application Support/ss.ge_tbilisi/`.
+  Перезапуск розкладу: `launchctl kickstart gui/$(id -u)/local.ss.ge_tbilisi.token`; вимкнути —
+  `launchctl bootout gui/$(id -u)/local.ss.ge_tbilisi.token`.
+- У `watcher.py`: `api_token()` спершу бере `SSGE_API_TOKEN`, якщо той діє ще ≥ 2 хв (`exp` з JWT,
+  без перевірки підпису); інакше або на 401 — як раніше, з головної (якщо ss.ge зніме блок, бот
+  працюватиме й без Mac). У журналі Actions видно, звідки ключ: «ключ до API — з Mac, діє до…» чи
+  «ключ з Mac прострочений… Mac, мабуть, спить».
+- **Залежність від Mac:** поки Mac спить чи вимкнений, ключ живе ще до години, далі бот стоїть.
+  Після 6 невдалих перевірок у групу йде «⚠️ ss.ge не отдаёт данные», після відновлення — «✅».
+  Пропущене приходить, якщо воно серед 48 найновіших у пошуку (`PAGES_PER_RUN` 3).
+- Перевірено 22.10.2026: 8 офлайн-перевірок `api_token` (дійсний / прострочений / зіпсований ключ,
+  401, без ключа) і живий запуск о 22:05 після 37 невдалих: «ключ до API — з Mac», 38 нових за
+  ~6 год простою (25 оброблено, решта — наступного запуску), `fail_streak` скинувся, у групу — «✅».
 
 ## Як бот читає ss.ge
 
@@ -161,6 +196,7 @@ GitHub → Settings → Secrets and variables → Actions (секрети **ць
 | `TELEGRAM_CHAT_ID` (secret) | основна група (оренда) «ss/myhome (аренда)», та сама, що в myhome_tbilisi |
 | `TELEGRAM_CHAT_ID_SALE` (secret) | група продажу «ss/myhome (Продажа)» — для пошуків з `\| sale` (з 13.10.2026) |
 | `OPENAI_API_KEY` (secret) | **не потрібен**: ss.ge сам дає опис російською. Лише запасний перекладач |
+| `SSGE_API_TOKEN` (secret) | гостьовий ключ до API ss.ge; кожні 20 хв його перезаписує Mac (`mac_token.py`, з 22.10.2026). Вручну не міняти |
 
 Локально — `telegram.json` у корені (`token`, `chat_id`, `chat_id_sale`), у `.gitignore`. Основна група —
 звичайна (не супергрупа), chat_id від'ємний без `-100`; група продажу — супергрупа, з `-100`.
