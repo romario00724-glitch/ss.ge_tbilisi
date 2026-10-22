@@ -35,6 +35,7 @@ jobs:
           TELEGRAM_CHAT_ID_SALE: ${{ secrets.TELEGRAM_CHAT_ID_SALE }}   # група продажу (пошуки з «| sale»)
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          SSGE_API_TOKEN: ${{ secrets.SSGE_API_TOKEN }}   # ключ до API ss.ge, його кожні 20 хв кладе Mac (mac_token.py)
         run: python watcher.py --once
 
       - name: Save state.json
