@@ -56,6 +56,8 @@ SKIP_SITE_AGENTS = True        # не надсилати, якщо ss.ge сам 
                                # (фільтр «От собственника» пропускає агентів-приватних осіб)
 SKIP_NO_REALTORS = True        # не надсилати, якщо автор пише «с агентствами не сотрудничаю»,
                                # «агентам не звонить» (лише Тбілісі; «сотрудничаю 50%» — надсилати)
+MAX_SITE_LISTINGS = 3          # не надсилати, якщо в автора на ss.ge більше стільки оголошень — агент
+                               # (рішення 23.10.2026); None — надсилати всіх
 MAX_ALERTS_PER_RUN = 25        # запобіжник від спаму; решта прийде наступного запуску
 LOOP_MINUTES = 10              # інтервал у безперервному режимі
 FAIL_ALERT_AFTER = 6           # після скількох невдалих перевірок поспіль написати в Telegram
@@ -1130,9 +1132,13 @@ def run_once(state):
         if OPENAI_API_KEY and TRANSLATE_ALERTS and time.time() < translate_deadline:
             translate_listing(item)
         count = author_count(state, item)
-        suspect = max(count, item.get("_site_count") or 0)
+        site = item.get("_site_count")
+        suspect = max(count, site or 0)
         if SKIP_SUSPECTED_AGENTS and suspect >= AGENT_THRESHOLD:
             log(f"  пропускаю {item['id']}: у автора {suspect} оголошень")
+            delivered = True
+        elif MAX_SITE_LISTINGS is not None and isinstance(site, int) and site > MAX_SITE_LISTINGS:
+            log(f"  пропускаю {item['id']}: у автора {site} оголошень на ss.ge")
             delivered = True
         elif SKIP_SITE_AGENTS and item.get("_site_agent"):
             log(f"  пропускаю {item['id']}: ss.ge ставить автору значок «Агент»")
