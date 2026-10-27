@@ -11,8 +11,8 @@
 # Фільтр «От собственника» і сортування «за датою» скрипт додає сам, навіть якщо ви їх не вмикали.
 #
 # Ціна «від» — у самому посиланні: priceFrom=350&currencyId=2&priceType=1 (від $350 за місяць).
-# Зараз оренда: квартири від $350, будинки від $1000, комерція від $600; продаж: квартири без
-# порогу, будинки від $100 000, комерція від $50 000.
+# Зараз оренда: квартири від $350, будинки від $1000, комерція від $600; продаж (вимкнено
+# 27.10.2026): квартири без порогу, будинки від $100 000, комерція від $50 000.
 # currencyId=2 — долари, 1 — лари; priceType=1 — ціна за всю площу (2 — за м²). Без priceType
 # ss.ge ціну мовчки ігнорує. Оголошення без ціни з таким фільтром теж не приходять.
 #
@@ -30,7 +30,8 @@
 Аренда домов Тбилиси | https://home.ss.ge/ru/недвижимость/l/Дом/Аренда?cityIdList=95,7,36,70&currencyId=2&priceType=1&priceFrom=1000&order=1&advancedSearch={"individualEntityOnly":true}
 Аренда коммерции Тбилиси | https://home.ss.ge/ru/недвижимость/l/Комерческая-площадь/Аренда?cityIdList=95,7,36,70&currencyId=2&priceType=1&priceFrom=600&order=1&advancedSearch={"individualEntityOnly":true}
 
-# Продаж — у групу «ss/myhome (Продажа)»
-Продажа Тбилиси | https://home.ss.ge/ru/недвижимость/l/Квартира/Продается?cityIdList=95,7,36,70&order=1&advancedSearch={"individualEntityOnly":true} | sale
-Продажа домов Тбилиси | https://home.ss.ge/ru/недвижимость/l/Дом/Продается?cityIdList=95,7,36,70&currencyId=2&priceType=1&priceFrom=100000&order=1&advancedSearch={"individualEntityOnly":true} | sale
-Продажа коммерции Тбилиси | https://home.ss.ge/ru/недвижимость/l/Комерческая-площадь/Продается?cityIdList=95,7,36,70&currencyId=2&priceType=1&priceFrom=50000&order=1&advancedSearch={"individualEntityOnly":true} | sale
+# Продаж — у групу «ss/myhome (Продажа)». Вимкнено 27.10.2026 (рішення користувача: група продажу
+# більше не потрібна, продаж на ss.ge шукає бот ai_podbor_nedvizhimosti). Щоб повернути — прибрати «# ».
+# Продажа Тбилиси | https://home.ss.ge/ru/недвижимость/l/Квартира/Продается?cityIdList=95,7,36,70&order=1&advancedSearch={"individualEntityOnly":true} | sale
+# Продажа домов Тбилиси | https://home.ss.ge/ru/недвижимость/l/Дом/Продается?cityIdList=95,7,36,70&currencyId=2&priceType=1&priceFrom=100000&order=1&advancedSearch={"individualEntityOnly":true} | sale
+# Продажа коммерции Тбилиси | https://home.ss.ge/ru/недвижимость/l/Комерческая-площадь/Продается?cityIdList=95,7,36,70&currencyId=2&priceType=1&priceFrom=50000&order=1&advancedSearch={"individualEntityOnly":true} | sale
