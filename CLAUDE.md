@@ -46,7 +46,45 @@
 робила хмарна сесія) — бот myhome.ge для тієї самої групи. Користувач хоче, щоб усі боти
 працювали **один в один**.
 
-## Як запускається
+## Як запускається (з 27.10.2026 — на Mac)
+
+```
+Mac (launchd, :05 :15 :25…) ──► mac_run.py: git pull ──► watcher.py --once ──► група
+                                            └──► state.json ──► git push у main
+```
+
+27.10.2026 ~16:15 ss.ge сховав за Cloudflare і API, і сервери GitHub більше не можуть читати ss.ge
+зовсім (див. «Історія»). Рішення користувача: перевірки робить сам Mac.
+- Копія репозиторію — `~/Library/Application Support/ss.ge_tbilisi/repo/` (`git clone` плюс
+  `telegram.json`, `chmod 600`), бо launchd не має доступу до «Робочого столу». Розклад —
+  `~/Library/LaunchAgents/local.ss.ge_tbilisi.watch.plist` (`StartCalendarInterval`, хвилини
+  5,15,…,55 — як був будильник, зсув від myhome_tbilisi; без `RunAtLoad`). Python —
+  `/Library/Frameworks/Python.framework/Versions/3.14/bin/python3` (у ньому є `curl_cffi`). Журнал —
+  `~/Library/Logs/ss.ge_tbilisi.log` (росте ~100–200 КБ на день, раз на кілька місяців можна чистити).
+- `mac_run.py` (у репозиторії) повторює workflow: `git pull --rebase --autostash` (не вдався —
+  `rebase --abort` і прохід зі старим кодом), `watcher.py --once` (до 8 хв), коміт `state.json`
+  («state: update [skip ci]») і `push`: 3 спроби з `pull --rebase -X theirs` — у конфлікті
+  перемагає база з Mac; невикладені коміти докладає наступного разу. Коміти — від
+  romario00724-glitch (локальний `git config` копії), вхід — `gh auth git-credential`.
+- **Код міняти тут, на «Робочому столі», і `git push`** — Mac підтягне його перед наступним
+  проходом сам (і `mac_run.py` теж). Копію в Application Support руками не правити.
+  `telegram.json` там — окремий файл: якщо міняєте його тут, скопіюйте й туди.
+- Ключ до API бот бере сам з головної — у журналі «ключ до API — з головної ss.ge, діє до…».
+- **Mac спить чи вимкнений — бот стоїть**; після пробудження launchd робить один пропущений
+  прохід. Пропущене приходить, якщо воно серед 48 найновіших у пошуку (`PAGES_PER_RUN` 3). Після
+  6 невдалих проходів поспіль у групу йде «⚠️ ss.ge не отдаёт данные», після відновлення — «✅».
+- Чи живий: `tail ~/Library/Logs/ss.ge_tbilisi.log` або свіжі коміти «state: update» на GitHub.
+  Позачерговий прохід — `launchctl kickstart gui/$(id -u)/local.ss.ge_tbilisi.watch`; вимкнути —
+  `launchctl bootout gui/$(id -u)/local.ss.ge_tbilisi.watch` і прибрати plist з LaunchAgents
+  (інакше після перезавантаження ввімкнеться знову).
+- **GitHub вимкнено:** workflow — `gh workflow disable watch.yml` (секрети лишилися); завдання
+  cron-job.org (job 8619228) вимикає користувач сам — входу туди в Claude немає. Повернути на GitHub
+  (якщо ss.ge колись відкриє API): `gh workflow enable watch.yml`, увімкнути завдання cron-job.org і
+  вимкнути розклад Mac — **ніколи не обидва разом**, інакше оголошення прийдуть двічі.
+- Передача ключа на GitHub (`mac_token.py`, розклад `local.ss.ge_tbilisi.token`) з 27.10.2026 не
+  потрібна й вимкнена: plist перенесено в `~/Library/Application Support/ss.ge_tbilisi/disabled/`.
+
+### До 27.10.2026 — GitHub Actions (тепер вимкнено)
 
 ```
 cron-job.org ──► workflow_dispatch ──► GitHub Actions: python watcher.py --once
@@ -63,7 +101,9 @@ cron-job.org ──► workflow_dispatch ──► GitHub Actions: python watche
 - Після запуску workflow комітить `state.json` у `main` — локальний `main` відстає: `git pull`.
 - **Ключ до API з 22.10.2026 бере Mac** (див. нижче): без нього бот на GitHub ss.ge не читає.
 
-## Ключ до API бере Mac (з 22.10.2026)
+## Ключ до API бере Mac (22–27.10.2026, тепер вимкнено)
+
+Поки бот працював на GitHub. З 27.10.2026 бот сам на Mac і ключ бере сам (див. «Як запускається»).
 
 22.10.2026 ~16:00 ss.ge закрив серверам GitHub усе, що стоїть за Cloudflare: `home.ss.ge` (навіть
 `robots.txt`), `account.ss.ge`, `jobs.ss.ge` — 403 «Just a moment...» (`cf-mitigated: challenge`),
@@ -213,6 +253,9 @@ GitHub (кожні 10 хв) ──► бере SSGE_API_TOKEN ──► API ss.g
 
 ## Секрети й налаштування
 
+**З 27.10.2026 бот на Mac бере все з `telegram.json` своєї копії** (див. «Як запускається»);
+секрети GitHub нижче лишилися на випадок повернення на GitHub, `SSGE_API_TOKEN` більше не оновлюється.
+
 GitHub → Settings → Secrets and variables → Actions (секрети **цього** репозиторію):
 
 | Назва | Що це |
@@ -233,8 +276,9 @@ GitHub → Settings → Secrets and variables → Actions (секрети **ць
 
 ## Правила роботи з кодом
 
-- **Не запускати `python watcher.py` на комп'ютері паралельно з GitHub** — у двох копій різні
-  `state.json`, і ті самі оголошення прийдуть у групу двічі.
+- **Не запускати `python watcher.py` з цієї папки** (тут теж є `telegram.json`) — бот уже працює
+  на Mac з копії в Application Support; у двох копій різні `state.json`, і ті самі оголошення
+  прийдуть у групу двічі. Позачерговий прохід — лише `launchctl kickstart` (див. «Як запускається»).
 - **`import watcher` + наявний `telegram.json` = реальні повідомлення** в групу. У тестах
   глушити `tg_call`, `tg_upload`, `download_image`, `_post_json` (OpenAI) і `save_state` (або
   підмінити `STATE_FILE`). Без `telegram.json` і змінних `TELEGRAM_*` бот лише друкує в консоль —
@@ -260,6 +304,17 @@ GitHub → Settings → Secrets and variables → Actions (секрети **ць
 
 ## Історія
 
+- **27.10.2026 — перевірки перенесено на Mac.** О ~16:15 ss.ge сховав за Cloudflare і API:
+  `api-gateway.ss.ge` тепер `server: cloudflare` (адреса 172.66.x), раніше `server: Kestrel`.
+  Запуски GitHub о 16:15 і 16:25 отримали 403 навіть із правильним ключем з Mac, а з Mac API
+  відповідає 200. Батумський ss.ge-бот — так само. Рішення користувача: перевірки робить Mac —
+  `mac_run.py` + launchd `local.ss.ge_tbilisi.watch`, workflow вимкнено (`gh workflow disable`),
+  передачу ключа (`local.ss.ge_tbilisi.token`) вимкнено. Перевірено: наскрізний прохід
+  `mac_run.py` у тимчасовій копії без Telegram з підставним «GitHub» (ключ з головної, 4 нові
+  оголошення, `state.json` викладено); конфлікт `state.json` під час збереження і вже на старті —
+  розв'язується на користь Mac, `rebase` не зависає. Перший справжній прохід з launchd о 16:41:
+  ключ з головної, 5 нових (2 відсіяно, 3 у групу), `state.json` на GitHub, `fail_streak` 3 → 0
+  (друге «⚠️» у групу не пішло).
 - **27.10.2026 — ключ до API тепер у cookie.** О ~13:29 ss.ge оновив сайт: `credentialsToken` з
   даних сторінки зник (у `pageProps` лишилися `session`, `userProfile`…), Mac писав «на сторінці
   ss.ge немає ключа до API», останній ключ діяв до 14:09, о 15:05 у групу пішло «⚠️ ss.ge не отдаёт
