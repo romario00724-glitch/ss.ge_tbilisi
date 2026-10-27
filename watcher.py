@@ -257,9 +257,9 @@ def mac_token():
 
 
 def api_token(refresh=False):
-    """Гостьовий ключ до API ss.ge, діє він годину. Спершу — той, що передав Mac, інакше —
-    з головної (але з 22.10.2026 сервери GitHub вона не пускає). З 27.10.2026 сайт кладе ключ
-    у cookie ss-session-token, раніше — у дані сторінки (credentialsToken)."""
+    """Гостьовий ключ до API ss.ge, діє він годину. Спершу — SSGE_API_TOKEN, якщо заданий (так було,
+    поки бот працював на GitHub), інакше — з головної. З 27.10.2026 сайт кладе ключ у cookie
+    ss-session-token, раніше — у дані сторінки (credentialsToken)."""
     global _api_token, _mac_checked
     if not refresh and not _api_token and not _mac_checked:
         _mac_checked = True
@@ -272,6 +272,8 @@ def api_token(refresh=False):
         _api_token = clean(cookies.get("ss-session-token") or data.get("credentialsToken"))
         if not _api_token:
             raise FetchError("на сторінці ss.ge немає ключа до API — можливо, сайт змінився")
+        expiry = token_expiry(_api_token)
+        log("ключ до API — з головної ss.ge" + (f", діє до {expiry:%H:%M}" if expiry else ""))
     return _api_token
 
 
