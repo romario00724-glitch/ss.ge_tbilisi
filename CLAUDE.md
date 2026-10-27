@@ -78,7 +78,8 @@ Mac (launchd, :05 :15 :25…) ──► mac_run.py: git pull ──► watcher.p
   `launchctl bootout gui/$(id -u)/local.ss.ge_tbilisi.watch` і прибрати plist з LaunchAgents
   (інакше після перезавантаження ввімкнеться знову).
 - **GitHub вимкнено:** workflow — `gh workflow disable watch.yml` (секрети лишилися); завдання
-  cron-job.org (job 8619228) вимикає користувач сам — входу туди в Claude немає. Повернути на GitHub
+  cron-job.org (job 8619228) користувач вимкнув сам 27.10.2026 («Увімкнути завдання» → off,
+  не видалено) — входу туди в Claude немає. Повернути на GitHub
   (якщо ss.ge колись відкриє API): `gh workflow enable watch.yml`, увімкнути завдання cron-job.org і
   вимкнути розклад Mac — **ніколи не обидва разом**, інакше оголошення прийдуть двічі.
 - Передача ключа на GitHub (`mac_token.py`, розклад `local.ss.ge_tbilisi.token`) з 27.10.2026 не
