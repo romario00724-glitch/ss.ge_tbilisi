@@ -69,20 +69,24 @@ cron-job.org ──► workflow_dispatch ──► GitHub Actions: python watche
 `robots.txt`), `account.ss.ge`, `jobs.ss.ge` — 403 «Just a moment...» (`cf-mitigated: challenge`),
 з будь-яким «браузером» `curl_cffi` і з urllib (пробний workflow, `git log`). Бот Батумі — так само.
 З Mac усе відкривається. **API `api-gateway.ss.ge` — не за Cloudflare (`server: Kestrel`) і GitHub
-відкритий**, тож бракує лише гостьового ключа: він є тільки на сторінках `home.ss.ge`
-(`credentialsToken`, JWT від `account.ss.ge`, `client_id` ssweb, діє 1 год, IP не прив'язаний).
+відкритий**, тож бракує лише гостьового ключа: його видає тільки `home.ss.ge` (JWT від
+`account.ss.ge`, `client_id` ssweb, діє 1 год, IP не прив'язаний; з 27.10.2026 — у cookie
+`ss-session-token`, раніше — `credentialsToken` у даних сторінки, див. «Історія»).
 Рішення користувача: ключ бере Mac, решта лишається на GitHub.
 
 ```
-Mac (launchd, кожні 20 хв) ──► home.ss.ge ──► ключ ──► gh secret set SSGE_API_TOKEN
+Mac (launchd, кожні 5 хв) ──► home.ss.ge ──► ключ ──► якщо довший за переданий: gh secret set SSGE_API_TOKEN
 GitHub (кожні 10 хв) ──► бере SSGE_API_TOKEN ──► API ss.ge ──► група
 ```
 
 - `mac_token.py` — у репозиторії, але launchd не має доступу до «Робочого столу», тож на Mac працює
   **копія**: `~/Library/Application Support/ss.ge_tbilisi/mac_token.py`; розклад —
-  `~/Library/LaunchAgents/local.ss.ge_tbilisi.token.plist` (`StartInterval` 1200, `RunAtLoad`);
+  `~/Library/LaunchAgents/local.ss.ge_tbilisi.token.plist` (`StartInterval` 300, `RunAtLoad`);
   журнал — `~/Library/Logs/ss.ge_tbilisi_token.log`. 3 спроби з паузою 30 с (після пробудження
   інтернет з'являється не одразу). Ключ у журнал не пишеться. `gh` бере вхід з Keychain.
+- На GitHub ключ іде, лише якщо діє довше за вже переданий: дата переданого — у
+  `mac_token_exp.txt` поруч з копією скрипта (у `.gitignore`). У журнал пишеться лише передача
+  («ключ оновлено, діє до …», кілька разів на годину) і помилки; перевірки без передачі — мовчки.
 - **Після зміни `mac_token.py`** скопіювати його в `~/Library/Application Support/ss.ge_tbilisi/`.
   Перезапуск розкладу: `launchctl kickstart gui/$(id -u)/local.ss.ge_tbilisi.token`; вимкнути —
   `launchctl bootout gui/$(id -u)/local.ss.ge_tbilisi.token`.
@@ -90,7 +94,8 @@ GitHub (кожні 10 хв) ──► бере SSGE_API_TOKEN ──► API ss.g
   без перевірки підпису); інакше або на 401 — як раніше, з головної (якщо ss.ge зніме блок, бот
   працюватиме й без Mac). У журналі Actions видно, звідки ключ: «ключ до API — з Mac, діє до…» чи
   «ключ з Mac прострочений… Mac, мабуть, спить».
-- **Залежність від Mac:** поки Mac спить чи вимкнений, ключ живе ще до години, далі бот стоїть.
+- **Залежність від Mac:** поки Mac спить чи вимкнений, ключ живе ще до години (з 27.10.2026 часто
+  менше — сайт віддає не новий ключ), далі бот стоїть.
   Після 6 невдалих перевірок у групу йде «⚠️ ss.ge не отдаёт данные», після відновлення — «✅».
   Пропущене приходить, якщо воно серед 48 найновіших у пошуку (`PAGES_PER_RUN` 3).
 - Перевірено 22.10.2026: 8 офлайн-перевірок `api_token` (дійсний / прострочений / зіпсований ключ,
@@ -100,7 +105,7 @@ GitHub (кожні 10 хв) ──► бере SSGE_API_TOKEN ──► API ss.g
 ## Як бот читає ss.ge
 
 Так само, як у Батумі (подробиці — CLAUDE.md ss.ge_batumi): гостьовий ключ з головної
-(`__NEXT_DATA__` → `credentialsToken`), пошук `POST api-gateway.ss.ge/v1/RealEstate/LegendSearch`
+(з 27.10.2026 — cookie `ss-session-token`, раніше `__NEXT_DATA__` → `credentialsToken`), пошук `POST api-gateway.ss.ge/v1/RealEstate/LegendSearch`
 з `Accept-Language: ru`, «От собственника» — `advancedSearch.individualEntityOnly`, `order: 1`;
 картка — три запити до API (`user-all-applications`, `agent-info`, `application-phones`), бо
 сторінок оголошень ss.ge серверам GitHub не віддає. Агентів зі значком сайту (`infoType` ≠ 0) бот
@@ -216,7 +221,7 @@ GitHub → Settings → Secrets and variables → Actions (секрети **ць
 | `TELEGRAM_CHAT_ID` (secret) | основна група (оренда) «ss/myhome (аренда)», та сама, що в myhome_tbilisi |
 | `TELEGRAM_CHAT_ID_SALE` (secret) | група продажу «ss/myhome (Продажа)» — для пошуків з `\| sale` (з 13.10.2026) |
 | `OPENAI_API_KEY` (secret) | **не потрібен**: ss.ge сам дає опис російською. Лише запасний перекладач |
-| `SSGE_API_TOKEN` (secret) | гостьовий ключ до API ss.ge; кожні 20 хв його перезаписує Mac (`mac_token.py`, з 22.10.2026). Вручну не міняти |
+| `SSGE_API_TOKEN` (secret) | гостьовий ключ до API ss.ge; його перезаписує Mac (`mac_token.py`, з 22.10.2026; перевіряє кожні 5 хв). Вручну не міняти |
 
 Локально — `telegram.json` у корені (`token`, `chat_id`, `chat_id_sale`), у `.gitignore`. Основна група —
 звичайна (не супергрупа), chat_id від'ємний без `-100`; група продажу — супергрупа, з `-100`.
@@ -255,6 +260,21 @@ GitHub → Settings → Secrets and variables → Actions (секрети **ць
 
 ## Історія
 
+- **27.10.2026 — ключ до API тепер у cookie.** О ~13:29 ss.ge оновив сайт: `credentialsToken` з
+  даних сторінки зник (у `pageProps` лишилися `session`, `userProfile`…), Mac писав «на сторінці
+  ss.ge немає ключа до API», останній ключ діяв до 14:09, о 15:05 у групу пішло «⚠️ ss.ge не отдаёт
+  данные». Той самий гостьовий ключ (JWT `ssweb` від `account.ss.ge`, 1 год) сайт тепер ставить у
+  cookie `ss-session-token` (`Set-Cookie` відповіді головної, без HttpOnly). `mac_token.py` і запасний
+  шлях `api_token` у `watcher.py` беруть ключ спершу з cookie, інакше — як раніше з `credentialsToken`
+  (`_http` тепер повертає й cookie відповіді). **Друга зміна сайту:** раніше кожен запит отримував
+  свіжий ключ (Mac о 12:09 → діє до 13:09), а тепер кожен сервер ss.ge (їх кілька, ключі різняться
+  на 1–3 хв) роздає той самий, поки той не спливе: о 15:58 усі ключі були видані о 15:21–15:24.
+  Тож ключу з сайту може лишатися кілька хвилин, і з оновленням раз на 20 хв бот щогодини
+  стояв би до 20 хв. Тому Mac перевіряє кожні 5 хв і передає ключ, лише коли той довший за вже
+  переданий. Перевірено: 10 перевірок ключа (живий ss.ge через curl_cffi і urllib, 401 → свіжий
+  ключ, старий вигляд сайту, обидва місця, без ключа, 403) і 7 офлайн-перевірок логіки передачі
+  (підставний `gh`). Батумський ss.ge-бот зламався так само (той самий журнал з 13:29) — його
+  виправляють у його сесії.
 - **27.10.2026 — продаж вимкнено** (масова правка координатора №7, рішення користувача): група
   «ss/myhome (Продажа)» більше не потрібна, продаж на ss.ge тепер шукає бот ai_podbor_nedvizhimosti.
   У `searches.txt` три рядки `| sale` закоментовано (`# ` на початку), три пошуки оренди не мінялися.

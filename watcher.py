@@ -18,6 +18,7 @@ import base64
 import hashlib
 import hmac
 import html
+import http.cookies
 import json
 import os
 import random
@@ -170,18 +171,18 @@ RETRY_STATUSES = (403, 429, 500, 502, 503, 504)  # відмови, які в ss.
 
 
 def _http(url, headers=None, payload=None):
-    """GET, а з payload — POST із JSON. Повертає (код, текст).
+    """GET, а з payload — POST із JSON. Повертає (код, текст, cookie з відповіді).
 
     Якщо сайт відмовив (403, 429, 5xx), чекає кілька секунд і пробує ще раз: 30.09.2026 о 17:05
     ss.ge разово відповів 403, а вже о 17:15 усе працювало.
     """
-    status, body = _http_once(url, headers, payload)
+    status, body, cookies = _http_once(url, headers, payload)
     if status in RETRY_STATUSES:
         pause = random.uniform(5, 10)
         log(f"  {urllib.parse.urlsplit(url).netloc}: HTTP {status}, пробую ще раз за {pause:.0f} с")
         time.sleep(pause)
-        status, body = _http_once(url, headers, payload)
-    return status, body
+        status, body, cookies = _http_once(url, headers, payload)
+    return status, body, cookies
 
 
 def _http_once(url, headers=None, payload=None):
@@ -191,15 +192,19 @@ def _http_once(url, headers=None, payload=None):
                 resp = cffi_requests.get(url, headers=headers, impersonate="chrome", timeout=30)
             else:
                 resp = cffi_requests.post(url, json=payload, headers=headers, impersonate="chrome", timeout=30)
-            return resp.status_code, resp.text
+            return resp.status_code, resp.text, dict(resp.cookies)
         data = None if payload is None else json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(url, data=data, headers={
             "User-Agent": USER_AGENT, **({"Content-Type": "application/json"} if data else {}), **(headers or {})})
         try:
             with urllib.request.urlopen(req, timeout=30, context=ssl_context()) as resp:
-                return resp.status, resp.read().decode("utf-8", "replace")
+                cookies = http.cookies.SimpleCookie()
+                for header in resp.headers.get_all("Set-Cookie") or []:
+                    cookies.load(header)
+                return (resp.status, resp.read().decode("utf-8", "replace"),
+                        {name: morsel.value for name, morsel in cookies.items()})
         except urllib.error.HTTPError as e:
-            return e.code, e.read().decode("utf-8", "replace")
+            return e.code, e.read().decode("utf-8", "replace"), {}
     except Exception as e:
         raise FetchError(f"мережева помилка: {e}") from e
 
@@ -212,14 +217,14 @@ def check_status(status, where):
 
 
 def page_data(url):
-    """Дані сторінки сайту: Next.js кладе їх у <script id="__NEXT_DATA__">."""
-    status, body = _http(url, {"Accept-Language": LANG})
+    """Дані сторінки сайту (Next.js кладе їх у <script id="__NEXT_DATA__">) і її cookie."""
+    status, body, cookies = _http(url, {"Accept-Language": LANG})
     check_status(status, "сторінка ss.ge")
     match = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', body, re.S)
     if not match:
         raise FetchError("на сторінці немає даних — можливо, це сторінка перевірки від Cloudflare")
     try:
-        return as_dict(as_dict(json.loads(match.group(1)).get("props")).get("pageProps"))
+        return as_dict(as_dict(json.loads(match.group(1)).get("props")).get("pageProps")), cookies
     except ValueError:
         raise FetchError("дані сторінки не читаються — можливо, сайт змінився")
 
@@ -253,17 +258,18 @@ def mac_token():
 
 def api_token(refresh=False):
     """Гостьовий ключ до API ss.ge, діє він годину. Спершу — той, що передав Mac, інакше —
-    з головної: сайт кладе його в кожну сторінку (але з 22.10.2026 сервери GitHub не пускає)."""
+    з головної (але з 22.10.2026 сервери GitHub вона не пускає). З 27.10.2026 сайт кладе ключ
+    у cookie ss-session-token, раніше — у дані сторінки (credentialsToken)."""
     global _api_token, _mac_checked
     if not refresh and not _api_token and not _mac_checked:
         _mac_checked = True
         _api_token = mac_token()
     if refresh or not _api_token:
         try:
-            data = page_data(f"{SITE}/{LANG}/")
+            data, cookies = page_data(f"{SITE}/{LANG}/")
         except FetchError as e:
             raise FetchError(f"ключ до API з головної: {e}") from e
-        _api_token = clean(data.get("credentialsToken"))
+        _api_token = clean(cookies.get("ss-session-token") or data.get("credentialsToken"))
         if not _api_token:
             raise FetchError("на сторінці ss.ge немає ключа до API — можливо, сайт змінився")
     return _api_token
@@ -284,7 +290,7 @@ def api_call(path, payload=None, params=None):
     """Запит до API ss.ge: GET, а з payload — POST. На 401 бере свіжий ключ і пробує ще раз."""
     url = API_BASE + path + ("?" + urllib.parse.urlencode(params) if params else "")
     for attempt in range(2):
-        status, body = _http(url, api_headers(), payload)
+        status, body, _ = _http(url, api_headers(), payload)
         if status != 401 or attempt:
             break
         api_token(refresh=True)  # ключ прострочився — беремо свіжий

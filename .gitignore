@@ -1,6 +1,9 @@
 # Токен бота — ніколи не викладати на GitHub
 telegram.json
 
+# Дата ключа, який mac_token.py уже передав на GitHub
+mac_token_exp.txt
+
 # Сміття
 .DS_Store
 __pycache__/
